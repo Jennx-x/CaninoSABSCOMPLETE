@@ -91,17 +91,3 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar usuario', error: error.message });
   }
 };
-
-exports.checkEmailExists = async (req, res) => {
-  const { email } = req.query;
-  if (!email) {
-    return res.status(400).json({ message: "Email is required" });
-  }
-
-  const user = await User.findOne({ where: { email } });
-  if (user) {
-    return res.status(200).json({ exists: true });
-  } else {
-    return res.status(200).json({ exists: false });
-  }
-};

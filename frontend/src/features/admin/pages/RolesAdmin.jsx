@@ -5,11 +5,17 @@ import { getRoles, postRoles, updateRole, deleteRole } from '../services/roles.s
 export const RolesAdmin = () => {
   const [roles, setRoles] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); 
-  const [currentRole, setCurrentRole] = useState({ name: '', description: '' }); 
+  const [modalMode, setModalMode] = useState('create');
+  const [currentRole, setCurrentRole] = useState({ id: null, name: '', description: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-//
+  const [validationErrors, setValidationErrors] = useState({});
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [itemToEdit, setItemToEdit] = useState(null);
+  const [showEditConfirmationModal, setShowEditConfirmationModal] = useState(false);
+  const [originalRoleData, setOriginalRoleData] = useState({});
+
   useEffect(() => {
     fetchRoles();
   }, []);
@@ -29,18 +35,22 @@ export const RolesAdmin = () => {
 
   const openCreateModal = () => {
     setModalMode('create');
-    setCurrentRole({ name: '', description: '' }); 
+    setCurrentRole({ id: null, name: '', description: '' });
+    setValidationErrors({});
     setShowModal(true);
   };
 
   const openEditModal = (role) => {
     setModalMode('edit');
     setCurrentRole({ ...role });
+    setOriginalRoleData({ ...role });
+    setValidationErrors({});
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
+    setValidationErrors({});
   };
 
   const handleInputChange = (e) => {
@@ -48,35 +58,79 @@ export const RolesAdmin = () => {
     setCurrentRole(prevRole => ({ ...prevRole, [name]: value }));
   };
 
+  const validateRole = (role, currentRoles, isEdit = false) => {
+    const errors = {};
+    if (!role.name.trim()) {
+      errors.name = 'El nombre del rol es requerido';
+    } else if (currentRoles.some(r => r.name.toLowerCase() === role.name.toLowerCase() && (isEdit ? r.id !== role.id : true))) {
+      errors.name = 'Ya existe un rol con este nombre';
+    }
+    return errors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (modalMode === 'create') {
+    const errors = validateRole(currentRole, roles);
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length === 0) {
       try {
-        await postRoles(currentRole);
-        fetchRoles();
-        closeModal();
+        if (modalMode === 'create') {
+          await postRoles(currentRole);
+          fetchRoles();
+          closeModal();
+        } else if (modalMode === 'edit') {
+          setItemToEdit(currentRole);
+          setShowEditConfirmationModal(true);
+        }
       } catch (err) {
-        setError(err.message || 'Error al crear rol');
+        setError(err.message || `Error al ${modalMode === 'create' ? 'crear' : 'actualizar'} rol`);
       }
-    } else if (modalMode === 'edit') {
+    }
+  };
+
+  const handleConfirmEdit = async () => {
+    const errors = validateRole(itemToEdit, roles, true);
+    setValidationErrors(errors);
+    if (Object.keys(errors).length === 0) {
       try {
-        await updateRole(currentRole.id, currentRole);
+        await updateRole(itemToEdit.id, itemToEdit);
         fetchRoles();
         closeModal();
+        setShowEditConfirmationModal(false);
+        setItemToEdit(null);
+        setOriginalRoleData({});
       } catch (err) {
         setError(err.message || 'Error al actualizar rol');
       }
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este rol?')) {
-      try {
-        await deleteRole(id);
-        fetchRoles();
-      } catch (err) {
-        setError(err.message || 'Error al eliminar rol');
-      }
+  const handleCancelEditConfirmation = () => {
+    setShowEditConfirmationModal(false);
+    setItemToEdit(null);
+    setCurrentRole({ ...originalRoleData });
+    setOriginalRoleData({});
+  };
+
+  const openDeleteConfirmationModal = (id) => {
+    setItemToDelete(id);
+    setShowConfirmationModal(true);
+  };
+
+  const handleCancelDeleteConfirmation = () => {
+    setShowConfirmationModal(false);
+    setItemToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteRole(itemToDelete);
+      fetchRoles();
+      setShowConfirmationModal(false);
+      setItemToDelete(null);
+    } catch (err) {
+      setError(err.message || 'Error al eliminar rol');
     }
   };
 
@@ -99,7 +153,7 @@ export const RolesAdmin = () => {
           <tr>
             <th>ID</th>
             <th>Nombre del Rol</th>
-            <th>Descripción</th> 
+            <th>Descripción</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -108,17 +162,18 @@ export const RolesAdmin = () => {
             <tr key={role.id}>
               <td>{role.id}</td>
               <td>{role.name}</td>
-              <td>{role.description}</td> 
+              <td>{role.description}</td>
               <td>
                 <div className="d-flex gap-2">
                   <Button variant="info" size="sm" className="me-2" onClick={() => openEditModal(role)}>Editar</Button>
-                  <Button variant="danger" size="sm" onClick={() => handleDelete(role.id)}>Eliminar</Button>
+                  <Button variant="danger" size="sm" onClick={() => openDeleteConfirmationModal(role.id)}>Eliminar</Button>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </Table>
+
       <Modal show={showModal} onHide={closeModal}>
         <Modal.Header closeButton>
           <Modal.Title>{modalMode === 'create' ? 'Crear Nuevo Rol' : 'Editar Rol'}</Modal.Title>
@@ -132,8 +187,12 @@ export const RolesAdmin = () => {
                 name="name"
                 value={currentRole.name}
                 onChange={handleInputChange}
+                isInvalid={!!validationErrors.name}
                 required
               />
+              <Form.Control.Feedback type="invalid">
+                {validationErrors.name}
+              </Form.Control.Feedback>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Descripción</Form.Label>
@@ -142,7 +201,12 @@ export const RolesAdmin = () => {
                 name="description"
                 value={currentRole.description}
                 onChange={handleInputChange}
+                isInvalid={!!validationErrors.description}
+                required
               />
+              <Form.Control.Feedback type="invalid">
+                {validationErrors.description}
+              </Form.Control.Feedback>
             </Form.Group>
             <Button variant="primary" type="submit">
               {modalMode === 'create' ? 'Crear' : 'Guardar Cambios'}
@@ -153,6 +217,32 @@ export const RolesAdmin = () => {
           <Button variant="secondary" onClick={closeModal}>
             Cancelar
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showConfirmationModal} onHide={handleCancelDeleteConfirmation}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar este rol?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancelDeleteConfirmation}>Cancelar</Button>
+          <Button variant="danger" onClick={handleConfirmDelete}>Eliminar</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showEditConfirmationModal} onHide={handleCancelEditConfirmation}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Cambios</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas guardar los cambios realizados en este rol?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancelEditConfirmation}>Cancelar</Button>
+          <Button variant="primary" onClick={handleConfirmEdit}>Guardar Cambios</Button>
         </Modal.Footer>
       </Modal>
     </Container>
