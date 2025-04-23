@@ -119,7 +119,42 @@ exports.getProductsByCategory = async (req, res) => {
 // Actualizar un producto
 exports.updateProduct = async (req, res) => {
     const { id } = req.params;
-    const { name, description, price, stock, categoryId } = req.body;
+    const { name, description, price, stock, categoryId, imageUrl } = req.body; 
+    try {
+      const product = await Product.findByPk(id);
+
+      if (!product) {
+        return res.status(404).json({
+          status: "error",
+          message: "Producto no encontrado",
+        });
+      }
+
+      product.name = name || product.name;
+      product.description = description || product.description;
+      product.price = price || product.price;
+      product.stock = stock || product.stock;
+      product.categoryId = categoryId || product.categoryId;
+      product.imageUrl = imageUrl || product.imageUrl; // Añadimos imageUrlpara poder que se actualice la url
+      await product.save();
+
+      res.status(200).json({
+        status: "success",
+        message: "Producto actualizado exitosamente",
+        product,
+      });
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: 'Error al actualizar el producto',
+            error: err.message
+        });
+    }
+};
+
+// Eliminar un producto
+exports.deleteProduct = async (req, res) => {
+    const { id } = req.params;
 
     try {
         const product = await Product.findByPk(id);
@@ -131,23 +166,16 @@ exports.updateProduct = async (req, res) => {
             });
         }
 
-        product.name = name || product.name;
-        product.description = description || product.description;
-        product.price = price || product.price;
-        product.stock = stock || product.stock;
-        product.categoryId = categoryId || product.categoryId;
-
-        await product.save();
+        await product.destroy();
 
         res.status(200).json({
             status: 'success',
-            message: 'Producto actualizado exitosamente',
-            product
+            message: 'Producto eliminado exitosamente'
         });
     } catch (err) {
         res.status(500).json({
             status: 'error',
-            message: 'Error al actualizar el producto',
+            message: 'Error al eliminar el producto',
             error: err.message
         });
     }
