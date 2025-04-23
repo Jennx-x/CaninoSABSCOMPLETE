@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  Container,
-  Table,
-  Button,
-  Modal,
-  Form,
-  Alert,
-  Row,
-  Col,
-} from "react-bootstrap";
+import { Container, Table, Button, Modal, Form, Alert, Row, Col } from "react-bootstrap";
 import {
   getProducts,
   postProducts,
@@ -52,7 +43,10 @@ export const ProductsAdmin = () => {
   const [formError, setFormError] = useState("");
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [errorCategories, setErrorCategories] = useState(null);
-
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false); 
+  const [productToDeleteId, setProductToDeleteId] = useState(null); 
+  const [showEditConfirmation, setShowEditConfirmation] = useState(false); 
+  const [productToEdit, setProductToEdit] = useState(null); 
   useEffect(() => {
     fetchProducts();
     fetchCategoriesData();
@@ -108,7 +102,7 @@ export const ProductsAdmin = () => {
 
   const openCreateModal = () => {
     setModalMode("create");
-    setFormError(""); // Limpiar error anterior
+    setFormError(""); 
     setCurrentProduct({
       name: "",
       description: "",
@@ -121,7 +115,7 @@ export const ProductsAdmin = () => {
   };
 
   const openEditModal = (product) => {
-      setModalMode("edit");
+    setModalMode("edit");
     setCurrentProduct({
       id: product.id,
       name: product.name,
@@ -129,7 +123,7 @@ export const ProductsAdmin = () => {
       price: product.price,
       stock: product.stock,
       categoryId: product.categoryId,
-      imageUrl: product.imageUrl || "", // Asegura que siempre haya un string
+      imageUrl: product.imageUrl || "",
     });
     setShowModal(true);
   };
@@ -145,6 +139,10 @@ export const ProductsAdmin = () => {
 
   const closeModal = () => {
     setShowModal(false);
+    setShowDeleteConfirmation(false); 
+    setShowEditConfirmation(false); 
+    setProductToDeleteId(null);
+    setProductToEdit(null);
   };
 
   const handleInputChange = (e) => {
@@ -154,9 +152,9 @@ export const ProductsAdmin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFormError(""); // Limpiar cualquier error previo
+    setFormError(""); 
 
-    // Asegurarse de que `currentProduct` esté limpio para una nueva creación
+    
     const { name, price, stock, categoryId, description, imageUrl } =
       currentProduct;
 
@@ -169,25 +167,25 @@ export const ProductsAdmin = () => {
       !imageUrl
     ) {
       setFormError("Por favor completa todos los campos obligatorios.");
-      return; // Evita enviar el formulario si los campos están vacíos
+      return; 
     }
 
     if (parseFloat(price) < 0 || parseInt(stock) < 0) {
       setFormError("El precio y el stock deben ser valores positivos.");
-      return; // Evita enviar el formulario si los valores son negativos
+      return; 
     }
 
-    // Validación: nombre único en modo crear
+  
     let nombreRepetido = false;
     if (modalMode === "create") {
-      // Busca si ya existe un producto con el mismo nombre
+      
       nombreRepetido = products.some(
         (prod) => prod.name.toLowerCase().trim() === name.toLowerCase().trim()
       );
     }
 
     if (modalMode === "edit") {
-      // Busca si existe otro producto (diferente al actual) con el mismo nombre
+      
       nombreRepetido = products.some(
         (prod) =>
           prod.name.toLowerCase().trim() === name.toLowerCase().trim() &&
@@ -197,33 +195,48 @@ export const ProductsAdmin = () => {
 
     if (nombreRepetido) {
       setFormError("Ya existe un producto con ese nombre.");
-      return; // Evita enviar el formulario si el nombre ya está en uso
+      return; 
     }
-    const confirmed = window.confirm(
-        "¿Estás seguro de que deseas guardar los cambios?"
-      );
-
-    try {
-      if (modalMode === "create") {
-        await postProducts(currentProduct); // Crear producto
-      } else {
-        await updateProduct(currentProduct.id, currentProduct); // Actualizar producto
+    if (modalMode === "edit") {
+      setProductToEdit(currentProduct); 
+      setShowEditConfirmation(true); 
+    } else {
+      try {
+        if (modalMode === "create") {
+          await postProducts(currentProduct); 
+        } else {
+          await updateProduct(currentProduct.id, currentProduct); 
+        }
+        fetchProducts(); 
+        closeModal(); 
+      } catch (err) {
+        setError(err.message || "Error al guardar el producto");
       }
-      fetchProducts(); // Obtener productos después de la operación
-      closeModal(); // Cerrar el modal
-    } catch (err) {
-      setError(err.message || "Error al guardar el producto");
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("¿Estás seguro de que deseas eliminar este producto?")) {
-      try {
-        await deleteProduct(id);
-        fetchProducts();
-      } catch (err) {
-        setError(err.message || "Error al eliminar producto");
-      }
+  const handleConfirmEdit = async () => {
+    try {
+      await updateProduct(productToEdit.id, productToEdit);
+      fetchProducts();
+      closeModal();
+    } catch (err) {
+      setError(err.message || "Error al actualizar producto");
+    }
+  };
+
+  const handleDeleteProduct = (id) => {
+    setProductToDeleteId(id); 
+    setShowDeleteConfirmation(true); 
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteProduct(productToDeleteId);
+      fetchProducts();
+      closeModal();
+    } catch (err) {
+      setError(err.message || "Error al eliminar producto");
     }
   };
 
@@ -258,7 +271,7 @@ export const ProductsAdmin = () => {
       </Row>
 
       <div className="table-responsive">
-        <Table striped bordered hover>
+        <Table striped bordered hover className="table-striped">
           <thead>
             <tr>
               <th>ID</th>
@@ -268,8 +281,8 @@ export const ProductsAdmin = () => {
               <th>Stock</th>
               <th>Categoría</th>
               <th>URL Imagen</th>
-              <th style={{ minWidth: "150px" }}>Acciones</th>{" "}
-              {/* Aumentado el minWidth a 150px */}
+              <th style={{ minWidth: "240px" }}>Acciones</th>{" "}
+              
             </tr>
           </thead>
           <tbody>
@@ -282,12 +295,12 @@ export const ProductsAdmin = () => {
                 <td>{product.stock}</td>
                 <td>{getCategoryName(product.categoryId)}</td>
                 <td style={styles.imageUrlCell}>{product.imageUrl}</td>
-                <td className="d-flex gap-2 flex-wrap">
+                <td className="d-flex gap-2">
                   <Button
                     variant="info"
                     size="sm"
                     className="mb-1 mb-md-0"
-                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem" }}
+                    style={{ padding: "0.25rem 0.5rem" }}
                     onClick={() => openEditModal(product)}
                   >
                     Editar
@@ -296,8 +309,8 @@ export const ProductsAdmin = () => {
                     variant="danger"
                     size="sm"
                     className="mb-1 mb-md-0"
-                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem" }}
-                    onClick={() => handleDelete(product.id)}
+                    style={{ padding: "0.25rem 0.5rem" }}
+                    onClick={() => handleDeleteProduct(product.id)} 
                   >
                     Eliminar
                   </Button>
@@ -305,7 +318,7 @@ export const ProductsAdmin = () => {
                     variant="success"
                     size="sm"
                     className="mb-1 mb-md-0"
-                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem" }}
+                    style={{ padding: "0.25rem 0.5rem" }}
                     onClick={() => openViewModal(product)}
                   >
                     Ver
@@ -320,9 +333,7 @@ export const ProductsAdmin = () => {
       <Modal show={showModal} onHide={closeModal} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            {modalMode === "create"
-              ? "Crear Nuevo Producto"
-              : "Editar Producto"}
+            {modalMode === "create" ? "Crear Nuevo Producto" : "Editar Producto"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -414,8 +425,8 @@ export const ProductsAdmin = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-      {/* modal para ver */}
-      <Modal show={showViewModal} onHide={closeViewModal}>
+      
+      <Modal show={showViewModal} onHide={closeViewModal} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Detalles del Producto</Modal.Title>
         </Modal.Header>
@@ -472,6 +483,41 @@ export const ProductsAdmin = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+      
+      <Modal show={showDeleteConfirmation} onHide={closeModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar este producto?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModal}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDelete}>
+            Eliminar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      
+      <Modal show={showEditConfirmation} onHide={closeModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Edición</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas guardar los cambios de este producto?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModal}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleConfirmEdit}>
+            Guardar Cambios
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };
+
