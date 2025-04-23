@@ -116,6 +116,7 @@ export const ProductsAdmin = () => {
 
   const openEditModal = (product) => {
     setModalMode("edit");
+    setFormError("");
     setCurrentProduct({
       id: product.id,
       name: product.name,
